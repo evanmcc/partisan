@@ -35,6 +35,8 @@
          on_down/2,
          send_message/2,
          forward_message/3,
+         forward_call/3,
+         forward_send/3,
          receive_message/1,
          decode/1,
          reserve/1,
@@ -96,6 +98,12 @@ send_message(Name, Message) ->
 %% @doc Forward message to registered process on the remote side.
 forward_message(Name, ServerRef, Message) ->
     gen_server:call(?MODULE, {forward_message, Name, ServerRef, Message}, infinity).
+
+forward_call(Name, ServerRef, Message) ->
+    gen_server:call(?MODULE, {forward_call, Name, ServerRef, Message}, infinity).
+
+forward_send(Name, ServerRef, Message) ->
+    gen_server:call(?MODULE, {forward_send, Name, ServerRef, Message}, infinity).
 
 %% @doc Receive message from a remote manager.
 receive_message(Message) ->
@@ -229,6 +237,18 @@ handle_call({forward_message, Name, ServerRef, Message}, _From,
             #state{connections=Connections}=State) ->
     Result = do_send_message(Name,
                              {forward_message, ServerRef, Message},
+                             Connections),
+    {reply, Result, State};
+handle_call({forward_call, Name, ServerRef, Message}, _From,
+            #state{connections=Connections}=State) ->
+    Result = do_send_message(Name,
+                             {forward_call, ServerRef, Message},
+                             Connections),
+    {reply, Result, State};
+handle_call({forward_send, Name, ServerRef, Message}, _From,
+            #state{connections=Connections}=State) ->
+    Result = do_send_message(Name,
+                             {forward_send, ServerRef, Message},
                              Connections),
     {reply, Result, State};
 
@@ -486,6 +506,12 @@ handle_message({receive_state, PeerMembership},
     end;
 handle_message({forward_message, ServerRef, Message}, State) ->
     gen_server:cast(ServerRef, Message),
+    {reply, ok, State};
+handle_message({forward_call, ServerRef, Message}, State) ->
+    gen_server:call(ServerRef, Message),
+    {reply, ok, State};
+handle_message({forward_send, ServerRef, Message}, State) ->
+    erlang:send(ServerRef, Message),
     {reply, ok, State}.
 
 %% @private
